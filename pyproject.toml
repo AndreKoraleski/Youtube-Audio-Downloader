@@ -23,4 +23,5 @@ dependencies = [
 ]
 
 [project.urls]
+"Homepage" = "https://github.com/andrekoraleski/youtube-downloader"
 
