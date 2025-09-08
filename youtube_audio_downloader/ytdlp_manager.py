@@ -38,7 +38,7 @@ class YtDlpManager:
                 
                 return self._execute_download(video_url, base_output_path)
                 
-            except VideoUnavailableError:
+            except (VideoUnavailableError, LowQualityError):
                 raise
 
             except Exception as e:
@@ -55,27 +55,29 @@ class YtDlpManager:
 
     def _execute_download(self, video_url: str, base_output_path: Path) -> Dict[str, Any]:
         """
-        Executes a single download attempt with a pre-download quality check.
+        Executes a single download attempt.
         """
+
         ydl_opts = self._build_ydl_options(base_output_path)
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(video_url, download=False)
-                metadata = self._extract_metadata(info_dict)
-                logger.debug(f"Extracted metadata for video: {metadata.get('title', 'Unknown')}")
-
+                
                 if self.config.min_audio_quality > 0:
                     abr = info_dict.get('abr', 0)
-                    if abr < self.config.min_audio_quality:
+
+                    if abr is not None and abr < self.config.min_audio_quality:
                         raise LowQualityError(f"Audio quality ({abr}k) is below the minimum of {self.config.min_audio_quality}k")
 
-                ydl.download([video_url])
+                result_dict = ydl.process_ie_result(info_dict, download=True)
                 
-                final_audio_path = info_dict.get('requested_downloads')[0]['filepath']
-
+                final_audio_path = result_dict.get('requested_downloads')[0]['filepath']
+                
                 if not final_audio_path or not Path(final_audio_path).exists():
                     raise DownloadFailedError("Download finished, but the final audio file could not be found.")
+
+                metadata = self._extract_metadata(result_dict)
 
                 return {
                     'success': True,
@@ -89,7 +91,6 @@ class YtDlpManager:
 
         except yt_dlp.DownloadError as e:
             error_msg = str(e).lower()
-            
             if any(keyword in error_msg for keyword in ['private', 'unavailable', 'deleted', 'removed']):
                 raise VideoUnavailableError(f"Video unavailable: {e}")
             
@@ -101,7 +102,7 @@ class YtDlpManager:
         
         except Exception as e:
             raise DownloadFailedError(f"Unexpected error during download: {e}")
-        
+    
 
     def _build_ydl_options(self, base_output_path: Path) -> Dict[str, Any]:
         """
@@ -158,7 +159,7 @@ class YtDlpManager:
         Handles the final error after all retries are exhausted.
         """
 
-        if isinstance(error, (VideoUnavailableError, NetworkError, DownloadFailedError)):
+        if isinstance(error, (VideoUnavailableError, NetworkError, DownloadFailedError, LowQualityError)):
             raise error
         
         else:
