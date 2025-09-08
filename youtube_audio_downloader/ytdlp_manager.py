@@ -55,44 +55,27 @@ class YtDlpManager:
 
     def _execute_download(self, video_url: str, base_output_path: Path) -> Dict[str, Any]:
         """
-        Executes a single download attempt.
+        Executes a single download attempt with a pre-download quality check.
         """
-
         ydl_opts = self._build_ydl_options(base_output_path)
-        metadata = {}
-        final_audio_path = None
-
-        def info_hook(d):
-            nonlocal final_audio_path
-            if d['status'] == 'finished':
-                final_audio_path = d.get('filename')
-                logger.debug(f"Download finished, final file: {final_audio_path}")
-        
-        ydl_opts['progress_hooks'] = [info_hook]
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    info = ydl.extract_info(video_url, download=False)
-                    metadata = self._extract_metadata(info)
-                    logger.debug(f"Extracted metadata for video: {metadata.get('title', 'Unknown')}")
+                info_dict = ydl.extract_info(video_url, download=False)
+                metadata = self._extract_metadata(info_dict)
+                logger.debug(f"Extracted metadata for video: {metadata.get('title', 'Unknown')}")
 
-                    if self.config.min_audio_quality > 0:
-                        abr = info.get('abr', 0)
-                        if abr < self.config.min_audio_quality:
-                            raise LowQualityError(f"Audio quality ({abr}k) is below the minimum of {self.config.min_audio_quality}k")
+                if self.config.min_audio_quality > 0:
+                    abr = info_dict.get('abr', 0)
+                    if abr < self.config.min_audio_quality:
+                        raise LowQualityError(f"Audio quality ({abr}k) is below the minimum of {self.config.min_audio_quality}k")
 
-                except Exception as e:
-                    logger.warning(f"Could not extract metadata: {e}")
-                
                 ydl.download([video_url])
                 
+                final_audio_path = info_dict.get('requested_downloads')[0]['filepath']
+
                 if not final_audio_path or not Path(final_audio_path).exists():
-                    audio_path = base_output_path.with_suffix(f".{self.config.audio_format}")
-                    if audio_path.exists():
-                        final_audio_path = str(audio_path)
-                    else:
-                        raise DownloadFailedError("Download finished, but the final audio file could not be found.")
+                    raise DownloadFailedError("Download finished, but the final audio file could not be found.")
 
                 return {
                     'success': True,
@@ -101,6 +84,9 @@ class YtDlpManager:
                     'error': None
                 }
                 
+        except LowQualityError:
+            raise
+
         except yt_dlp.DownloadError as e:
             error_msg = str(e).lower()
             
@@ -115,7 +101,7 @@ class YtDlpManager:
         
         except Exception as e:
             raise DownloadFailedError(f"Unexpected error during download: {e}")
-    
+        
 
     def _build_ydl_options(self, base_output_path: Path) -> Dict[str, Any]:
         """
