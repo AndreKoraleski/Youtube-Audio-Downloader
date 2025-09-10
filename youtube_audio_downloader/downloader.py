@@ -49,7 +49,10 @@ class Downloader:
             normalized_url = self.url_manager.normalize_url(video_url)
             
             metadata = self.ytdlp_manager.extract_info_only(normalized_url)
-            title = metadata.get('title') if metadata else None
+            if not metadata:
+                raise VideoUnavailableError("Could not retrieve video metadata.")
+
+            title = metadata.get('title')
             
             output_dir, base_output_path = self.filesystem_manager.prepare_download_paths(
                 video_id, title
@@ -64,11 +67,14 @@ class Downloader:
                 )
             
             logger.info("Downloading video ID: %s", video_id)
-            download_result = self.ytdlp_manager.download_video(normalized_url, base_output_path)
+            download_result = self.ytdlp_manager.download_video(video_url, base_output_path)
             
             verification = self.filesystem_manager.verify_download_results(base_output_path)
             if not verification['success']:
                 raise DownloadFailedError("Download verification failed - expected files not found")
+            
+            final_metadata = download_result.get('metadata', metadata)
+            self.filesystem_manager.save_metadata_file(base_output_path, final_metadata)
             
             logger.info("Download completed successfully for video ID: %s", video_id)
             return DownloadResult.success_result(
@@ -76,7 +82,7 @@ class Downloader:
                 video_url=normalized_url,
                 audio_path=verification['audio_file'],
                 subtitle_files=verification['subtitle_files'],
-                metadata=download_result.get('metadata', {})
+                metadata=final_metadata
             )
             
         except InvalidURLError as e:
@@ -108,7 +114,11 @@ class Downloader:
 
             if video_id:
                 try:
-                    output_dir, base_output_path = self.filesystem_manager.prepare_download_paths(video_id)
+                    temp_title = None
+                    if 'metadata' in locals() and metadata:
+                        temp_title = metadata.get('title')
+                        
+                    output_dir, base_output_path = self.filesystem_manager.prepare_download_paths(video_id, temp_title)
                     self.filesystem_manager.cleanup_failed_download(base_output_path)
                     
                 except Exception:

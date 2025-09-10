@@ -1,8 +1,9 @@
 import logging
 import os
 import re
+import json # --- NEW: Import json ---
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Dict, Any # --- NEW: Import Dict, Any ---
 
 from .config import DownloaderConfig
 from .exceptions import FileSystemError
@@ -125,7 +126,27 @@ class FilesystemManager:
         results['success'] = True
         return results
     
-    
+
+    def save_metadata_file(self, base_path: Path, metadata: Dict[str, Any]):
+        """
+        Saves the extracted metadata to a JSON file.
+        """
+
+        if not self.config.create_metadata_file:
+            return
+
+        metadata_path = base_path.with_suffix(".json")
+
+        try:
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=4, ensure_ascii=False)
+                
+            logger.info(f"Metadata file saved to: {metadata_path}")
+
+        except (OSError, TypeError) as e:
+            logger.error(f"Failed to save metadata file: {e}")
+
+
     def cleanup_failed_download(self, base_path: Path):
         """
         Cleans up partial files from a failed download.

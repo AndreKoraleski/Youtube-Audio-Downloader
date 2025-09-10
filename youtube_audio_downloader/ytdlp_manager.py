@@ -62,8 +62,10 @@ class YtDlpManager:
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
                 info_dict = ydl.extract_info(video_url, download=False)
-                
+                metadata = self._extract_metadata(info_dict)
+
                 if self.config.min_audio_quality > 0:
                     abr = info_dict.get('abr', 0)
 
@@ -72,12 +74,17 @@ class YtDlpManager:
 
                 result_dict = ydl.process_ie_result(info_dict, download=True)
                 
-                final_audio_path = result_dict.get('requested_downloads')[0]['filepath']
-                
+
+                if not result_dict.get('requested_downloads'):
+                    final_audio_path = str(base_output_path.with_suffix(f".{self.config.audio_format}"))
+                    if not Path(final_audio_path).exists():
+                         raise DownloadFailedError("Download was skipped, but the target file does not exist.")
+                    
+                else:
+                    final_audio_path = result_dict.get('requested_downloads')[0]['filepath']
+
                 if not final_audio_path or not Path(final_audio_path).exists():
                     raise DownloadFailedError("Download finished, but the final audio file could not be found.")
-
-                metadata = self._extract_metadata(result_dict)
 
                 return {
                     'success': True,
@@ -112,12 +119,15 @@ class YtDlpManager:
         output_template = f"{str(base_output_path)}.%(ext)s"
         
         postprocessor_args = []
-
         if self.config.sample_rate:
             postprocessor_args.extend(['-ar', str(self.config.sample_rate)])
-
-        if self.config.force_mono: 
+        if self.config.force_mono:
             postprocessor_args.extend(['-ac', '1'])
+
+        download_range = None
+        if self.config.download_time_range:
+            start, end = self.config.download_time_range
+            download_range = yt_dlp.utils.DateRange(start, end)
         
         opts = {
             'format': 'bestaudio/best',
@@ -127,11 +137,12 @@ class YtDlpManager:
                 'preferredcodec': self.config.audio_format,
                 'preferredquality': str(self.config.audio_quality),
             }],
-            'postprocessor_args': postprocessor_args, 
+            'postprocessor_args': postprocessor_args,
             'overwrites': self.config.overwrite_existing,
             'quiet': True,
             'noprogress': True,
             'extract_flat': False,
+            'download_ranges': download_range
         }
         
         if self.config.download_subtitles:
@@ -148,6 +159,17 @@ class YtDlpManager:
         """
         Extracts useful metadata from yt-dlp info dictionary.
         """
+        
+        chapters = None
+        if self.config.extract_chapters:
+            chapters = [
+                {
+                    'title': chap.get('title'),
+                    'start_time': chap.get('start_time'),
+                    'end_time': chap.get('end_time'),
+                }
+                for chap in info_dict.get('chapters', []) or []
+            ]
 
         return {
             'title': info_dict.get('title'),
@@ -160,6 +182,7 @@ class YtDlpManager:
             'tags': info_dict.get('tags', []),
             'resolution': info_dict.get('resolution'),
             'fps': info_dict.get('fps'),
+            'chapters': chapters
         }
     
 

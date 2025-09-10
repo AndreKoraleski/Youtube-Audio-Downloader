@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 @dataclass(frozen=True)
 class AudioFormat:
@@ -34,6 +34,11 @@ class DownloaderConfig:
     # --- Audio Processing Settings ---
     sample_rate: Optional[int] = None
     force_mono: bool = False
+
+    # --- Advanced Processing & Efficiency ---
+    download_time_range: Optional[Tuple[str, str]] = None # e.g., ("01:00", "05:30")
+    extract_chapters: bool = True
+    create_metadata_file: bool = True
 
     # --- Audio Format and Quality Constants ---
     MP3: str = AudioFormat.MP3
