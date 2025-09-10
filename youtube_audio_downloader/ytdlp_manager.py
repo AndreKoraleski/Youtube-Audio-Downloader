@@ -111,6 +111,14 @@ class YtDlpManager:
 
         output_template = f"{str(base_output_path)}.%(ext)s"
         
+        postprocessor_args = []
+
+        if self.config.sample_rate:
+            postprocessor_args.extend(['-ar', str(self.config.sample_rate)])
+
+        if self.config.force_mono: 
+            postprocessor_args.extend(['-ac', '1'])
+        
         opts = {
             'format': 'bestaudio/best',
             'outtmpl': output_template,
@@ -119,6 +127,7 @@ class YtDlpManager:
                 'preferredcodec': self.config.audio_format,
                 'preferredquality': str(self.config.audio_quality),
             }],
+            'postprocessor_args': postprocessor_args, 
             'overwrites': self.config.overwrite_existing,
             'quiet': True,
             'noprogress': True,

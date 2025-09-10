@@ -31,6 +31,10 @@ class DownloaderConfig:
     audio_quality: int = AudioQuality.BEST_AVAILABLE
     overwrite_existing: bool = False
 
+    # --- Audio Processing Settings ---
+    sample_rate: Optional[int] = None
+    force_mono: bool = False
+
     # --- Audio Format and Quality Constants ---
     MP3: str = AudioFormat.MP3
     WAV: str = AudioFormat.WAV
