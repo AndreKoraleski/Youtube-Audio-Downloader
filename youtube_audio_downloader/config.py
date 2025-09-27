@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union, Callable
 
 @dataclass(frozen=True)
 class AudioFormat:
@@ -73,8 +73,8 @@ class DownloaderConfig:
     retry_delay_seconds: float = 2.0
 
     # --- Logging ---
-    success_log: Optional[str] = None
-    error_log: Optional[str] = None
+    success_log: Union[Optional[str], Callable] = None
+    error_log: Union[Optional[str], Callable] = None
 
     def __post_init__(self):
         """Validate configuration after initialization."""

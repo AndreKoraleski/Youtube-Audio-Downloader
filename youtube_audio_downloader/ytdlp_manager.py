@@ -117,18 +117,13 @@ class YtDlpManager:
         """
 
         output_template = f"{str(base_output_path)}.%(ext)s"
-        
+
         postprocessor_args = []
         if self.config.sample_rate:
             postprocessor_args.extend(['-ar', str(self.config.sample_rate)])
         if self.config.force_mono:
             postprocessor_args.extend(['-ac', '1'])
 
-        download_range = None
-        if self.config.download_time_range:
-            start, end = self.config.download_time_range
-            download_range = yt_dlp.utils.DateRange(start, end)
-        
         opts = {
             'format': 'bestaudio/best',
             'outtmpl': output_template,
@@ -142,9 +137,12 @@ class YtDlpManager:
             'quiet': True,
             'noprogress': True,
             'extract_flat': False,
-            'download_ranges': download_range
         }
-        
+
+        if self.config.download_time_range:
+            start, end = self.config.download_time_range
+            opts['download_ranges'] = yt_dlp.utils.DateRange(start, end)
+
         if self.config.download_subtitles:
             opts.update({
                 'writesubtitles': True,
@@ -152,7 +150,7 @@ class YtDlpManager:
                 'subtitleslangs': self.config.subtitle_languages,
                 'subtitlesformat': 'vtt',
             })
-        
+
         return opts
     
     def _extract_metadata(self, info_dict: Dict[str, Any]) -> Dict[str, Any]:

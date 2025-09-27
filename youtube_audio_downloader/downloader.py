@@ -19,6 +19,11 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 
+class InfoFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.INFO
+
+
 class Downloader:
     """
     Main downloader class that coordinates all components.
@@ -34,8 +39,36 @@ class Downloader:
         self.filesystem_manager = FilesystemManager(config)
         self.ytdlp_manager = YtDlpManager(config)
         
+        self._setup_logging()
+        
         logger.info("Downloader initialized with config: %s", self.config)
     
+    def _setup_logging(self):
+        """
+        Configures file logging based on the provided config.
+        """
+        lib_logger = logging.getLogger('youtube_audio_downloader')
+        lib_logger.setLevel(logging.DEBUG) 
+
+        # --- Error Log Handler ---
+        if isinstance(self.config.error_log, str):
+            error_handler = logging.FileHandler(self.config.error_log)
+            error_handler.setLevel(logging.WARNING)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            error_handler.setFormatter(formatter)
+            lib_logger.addHandler(error_handler)
+            logger.debug(f"Attached error log handler to: {self.config.error_log}")
+
+        # --- Success Log Handler ---
+        if isinstance(self.config.success_log, str):
+            success_handler = logging.FileHandler(self.config.success_log)
+            success_handler.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            success_handler.setFormatter(formatter)
+            success_handler.addFilter(InfoFilter())
+            lib_logger.addHandler(success_handler)
+            logger.debug(f"Attached success log handler to: {self.config.success_log}")
+
 
     def download(self, video_url: str) -> DownloadResult:
         """

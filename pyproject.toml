@@ -19,9 +19,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "yt-dlp==2025.9.5"
+    "yt-dlp>=2023.12.30"
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/andrekoraleski/youtube-downloader"
-
