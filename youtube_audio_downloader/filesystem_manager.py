@@ -1,9 +1,10 @@
 import logging
 import os
 import re
-import json # --- NEW: Import json ---
+import json
+import shutil
 from pathlib import Path
-from typing import Tuple, Dict, Any # --- NEW: Import Dict, Any ---
+from typing import Tuple, Dict, Any
 
 from .config import DownloaderConfig
 from .exceptions import FileSystemError
@@ -170,6 +171,17 @@ class FilesystemManager:
                         
         except Exception as e:
             logger.warning(f"Error during cleanup: {e}")
+    
+    def remove_video_subdirectory(self, output_dir: Path):
+        """
+        Removes the video-specific subdirectory if it exists.
+        """
+        if self.config.create_video_subdirectory and output_dir and output_dir.exists():
+            try:
+                shutil.rmtree(output_dir)
+                logger.info(f"Removed directory for failed download: {output_dir}")
+            except OSError as e:
+                logger.warning(f"Could not remove directory {output_dir}: {e}")
 
     def remove_empty_directories(self, root_dir: Path):
         """

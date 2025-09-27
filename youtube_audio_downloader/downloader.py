@@ -48,9 +48,8 @@ class Downloader:
         Configures file logging based on the provided config.
         """
         lib_logger = logging.getLogger('youtube_audio_downloader')
-        lib_logger.setLevel(logging.DEBUG) 
+        lib_logger.setLevel(logging.DEBUG)
 
-        # --- Error Log Handler ---
         if isinstance(self.config.error_log, str):
             error_handler = logging.FileHandler(self.config.error_log)
             error_handler.setLevel(logging.WARNING)
@@ -59,7 +58,6 @@ class Downloader:
             lib_logger.addHandler(error_handler)
             logger.debug(f"Attached error log handler to: {self.config.error_log}")
 
-        # --- Success Log Handler ---
         if isinstance(self.config.success_log, str):
             success_handler = logging.FileHandler(self.config.success_log)
             success_handler.setLevel(logging.INFO)
@@ -75,6 +73,8 @@ class Downloader:
         Downloads a single YouTube video's audio and optionally subtitles.
         """
         video_id = None
+        output_dir = None
+        base_output_path = None
         
         try:
             logger.info("Starting download for URL: %s", video_url)
@@ -118,51 +118,25 @@ class Downloader:
                 metadata=final_metadata
             )
             
-        except InvalidURLError as e:
-            logger.error("Invalid URL provided: %s", e)
-            return DownloadResult.error_result(
-                video_id or "unknown", video_url, str(e)
-            )
-            
-        except VideoUnavailableError as e:
-            logger.error("Video unavailable: %s", e)
-            return DownloadResult.error_result(
-                video_id or "unknown", video_url, str(e)
-            )
-
-        except LowQualityError as e:
-            logger.warning("Video skipped due to low quality: %s", e)
-            return DownloadResult.error_result(
-                video_id or "unknown", video_url, str(e)
-            )
-            
-        except FileSystemError as e:
-            logger.error("Filesystem error: %s", e)
-            return DownloadResult.error_result(
-                video_id or "unknown", video_url, str(e)
-            )
-            
-        except (NetworkError, DownloadFailedError) as e:
-            logger.error("Download failed: %s", e)
-
-            if video_id:
-                try:
-                    temp_title = None
-                    if 'metadata' in locals() and metadata:
-                        temp_title = metadata.get('title')
-                        
-                    output_dir, base_output_path = self.filesystem_manager.prepare_download_paths(video_id, temp_title)
-                    self.filesystem_manager.cleanup_failed_download(base_output_path)
-                    
-                except Exception:
-                    pass
-            
+        except (
+            InvalidURLError, VideoUnavailableError, LowQualityError, 
+            FileSystemError, NetworkError, DownloadFailedError
+        ) as e:
+            logger.error("Download failed due to a known error: %s", e)
+            if base_output_path:
+                self.filesystem_manager.cleanup_failed_download(base_output_path)
+            if output_dir:
+                self.filesystem_manager.remove_video_subdirectory(output_dir)
             return DownloadResult.error_result(
                 video_id or "unknown", video_url, str(e)
             )
             
         except Exception as e:
-            logger.exception("Unexpected error during download")
+            logger.exception("An unexpected error occurred during download")
+            if base_output_path:
+                self.filesystem_manager.cleanup_failed_download(base_output_path)
+            if output_dir:
+                self.filesystem_manager.remove_video_subdirectory(output_dir)
             return DownloadResult.error_result(
                 video_id or "unknown", video_url, f"Unexpected error: {str(e)}"
             )
